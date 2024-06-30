@@ -3,8 +3,8 @@ FROM python:3.8-slim-bullseye
 ARG BUILD_DATE
 
 LABEL \
-  maintainer="Logan Marchione <logan@loganmarchione.com>" \
-  org.opencontainers.image.authors="Logan Marchione <logan@loganmarchione.com>" \
+  maintainer="Diego Castilho <castilho@diegocastilho.me>" \
+  org.opencontainers.image.authors="Diego Castilho <castilho@diegocastilho.me>" \
   org.opencontainers.image.title="docker-speedtest-influxdb" \
   org.opencontainers.image.description="Runs Ookla's Speedtest CLI program in Docker, sends the results to InfluxDB" \
   org.opencontainers.image.created=$BUILD_DATE
