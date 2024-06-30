@@ -76,14 +76,3 @@ docker compose -f docker-compose-dev.yml logs -f
 # Destroy when done
 docker compose -f docker-compose-dev.yml down
 ```
-
-## TODO
-- [ ] Learn Python
-- [x] ~~Run the processes inside the container as a non-root user~~
-- [ ] Add a [healthcheck](https://docs.docker.com/engine/reference/builder/#healthcheck)
-- [x] ~~Move the database connection check to a function~~
-- [x] ~~Add logic to check if variables are set~~
-- [x] ~~Add defaults for HOST and PORT~~
-- [ ] Update CI/CD with tests
-- [x] ~~Add warning about bandwidth~~
-- [ ] Implement an authentication check when [this PR](https://github.com/influxdata/influxdb-client-python/pull/269) is merged
