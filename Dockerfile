@@ -1,4 +1,4 @@
-FROM python:3.8-slim-bullseye
+FROM python:3.13.0rc1-slim
 
 ARG BUILD_DATE
 
