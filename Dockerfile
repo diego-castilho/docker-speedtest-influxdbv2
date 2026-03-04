@@ -1,4 +1,4 @@
-FROM python:3.15-rc-alpine3.22
+FROM python:3.13-slim-bookworm
 
 ARG BUILD_DATE
 
@@ -16,9 +16,9 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     curl \
     gnupg2 \
     tzdata && \
-    curl -s https://install.speedtest.net/app/cli/install.deb.sh | bash && \
     mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://packagecloud.io/ookla/speedtest-cli/gpgkey | gpg --dearmor > /etc/apt/keyrings/ookla_speedtest-cli-archive-keyring.gpg && \
+    curl -fsSL https://packagecloud.io/ookla/speedtest-cli/gpgkey | gpg --dearmor -o /etc/apt/keyrings/ookla_speedtest-cli-archive-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/ookla_speedtest-cli-archive-keyring.gpg] https://packagecloud.io/ookla/speedtest-cli/debian/ bookworm main" > /etc/apt/sources.list.d/ookla_speedtest-cli.list && \
     apt-get update && apt-get -y install --no-install-recommends speedtest && \
     rm -rf /var/lib/apt/lists/* && \
     adduser --system speedtest

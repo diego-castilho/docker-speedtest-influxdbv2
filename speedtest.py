@@ -3,6 +3,7 @@
 import datetime
 import json
 import os
+import re
 import subprocess  # nosec B404
 import time
 import socket
@@ -12,18 +13,55 @@ from influxdb_client import InfluxDBClient
 # Variables
 influxdb_scheme = os.getenv("INFLUXDB_SCHEME", "http")
 influxdb_host = os.getenv("INFLUXDB_HOST", "localhost")
-influxdb_port = int(os.getenv("INFLUXDB_PORT", 8086))
 influxdb_user = os.getenv("INFLUXDB_USER")
 influxdb_pass = os.getenv("INFLUXDB_PASS")
 influxdb_token = os.getenv("INFLUXDB_TOKEN")
 influxdb_org = os.getenv("INFLUXDB_ORG", "-")
 influxdb_db = os.getenv("INFLUXDB_DB")
-sleepy_time = int(os.getenv("SLEEPY_TIME", 3600))
 start_time = datetime.datetime.utcnow().isoformat()
 default_hostname = socket.gethostname()
 hostname = os.getenv("SPEEDTEST_HOST", default_hostname)
 speedtest_server = os.getenv("SPEEDTEST_SERVER")
-debug_mode = bool(os.getenv("DEBUG_MODE", False))
+debug_mode = os.getenv("DEBUG_MODE", "").lower() in ("true", "1", "yes")
+
+# Validate numeric environment variables
+try:
+    influxdb_port = int(os.getenv("INFLUXDB_PORT", 8086))
+except ValueError:
+    print("ERROR: INFLUXDB_PORT must be a valid integer")
+    sys.exit(1)
+
+try:
+    sleepy_time = int(os.getenv("SLEEPY_TIME", 3600))
+except ValueError:
+    print("ERROR: SLEEPY_TIME must be a valid integer")
+    sys.exit(1)
+
+if sleepy_time < 0:
+    print("ERROR: SLEEPY_TIME must be a non-negative integer")
+    sys.exit(1)
+
+# Validate speedtest server ID is numeric (prevents argument injection)
+if speedtest_server and not re.match(r'^\d+$', speedtest_server):
+    print("ERROR: SPEEDTEST_SERVER must be a numeric server ID")
+    sys.exit(1)
+
+
+def escape_line_protocol_tag(value):
+    """Escape special characters in InfluxDB line protocol tag values."""
+    value = str(value)
+    value = value.replace(" ", "\\ ")
+    value = value.replace(",", "\\,")
+    value = value.replace("=", "\\=")
+    return value
+
+
+def escape_line_protocol_field_str(value):
+    """Escape special characters in InfluxDB line protocol string field values."""
+    value = str(value)
+    value = value.replace("\\", "\\\\")
+    value = value.replace('"', '\\"')
+    return value
 
 
 def db_check():
@@ -56,11 +94,11 @@ def speedtest():
         print("STATE: User specified speedtest server:", speedtest_server)
         speedtest_server_arg = "--server-id="+speedtest_server
         print("STATE: Speedtest running")
-        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json', speedtest_server_arg], stdout=subprocess.PIPE, shell=False, text=True, check=True)  # nosec B603
+        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json', speedtest_server_arg], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True, check=True, timeout=120)  # nosec B603
     else:
         print("STATE: User did not specify speedtest server, using a random server")
         print("STATE: Speedtest running")
-        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json'], stdout=subprocess.PIPE, shell=False, text=True, check=True)  # nosec B603
+        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True, check=True, timeout=120)  # nosec B603
 
     # Convert the string into JSON, only getting the stdout and stripping the first/last characters
     my_json = json.loads(my_speed.stdout.strip())
@@ -88,9 +126,22 @@ def speedtest():
     print("STATE: Your server info  ", speedtest_server_id, speedtest_server_name, speedtest_server_location, speedtest_server_country, speedtest_server_host)
     print("STATE: Your URL is       ", result_url)
 
-    # This is ugly, but trying to get output in line protocol format (UNIX time is appended automatically)
+    # Build InfluxDB line protocol with proper escaping
     # https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
-    p = "speedtest," + "service=speedtest.net," + "host=" + str(hostname) + " download=" + str(speed_down) + ",upload=" + str(speed_up) + ",ping_latency=" + str(ping_latency) + ",ping_jitter=" + str(ping_jitter) + ",speedtest_server_id=" + str(speedtest_server_id) + ",speedtest_server_name=" + "\"" + str(speedtest_server_name) + "\"" + ",speedtest_server_location=" + "\"" + str(speedtest_server_location) + "\"" + ",speedtest_server_country=" + "\"" + str(speedtest_server_country) + "\"" + ",speedtest_server_host=" + "\"" + str(speedtest_server_host) + "\"" + ",result_url=" + "\"" + str(result_url) + "\""
+    safe_hostname = escape_line_protocol_tag(hostname)
+    p = (
+        f"speedtest,service=speedtest.net,host={safe_hostname} "
+        f"download={int(speed_down)},"
+        f"upload={int(speed_up)},"
+        f"ping_latency={float(ping_latency)},"
+        f"ping_jitter={float(ping_jitter)},"
+        f"speedtest_server_id={int(speedtest_server_id)},"
+        f'speedtest_server_name="{escape_line_protocol_field_str(speedtest_server_name)}",'
+        f'speedtest_server_location="{escape_line_protocol_field_str(speedtest_server_location)}",'
+        f'speedtest_server_country="{escape_line_protocol_field_str(speedtest_server_country)}",'
+        f'speedtest_server_host="{escape_line_protocol_field_str(speedtest_server_host)}",'
+        f'result_url="{escape_line_protocol_field_str(result_url)}"'
+    )
     # For troubleshooting the raw line protocol
     # print(p)
 
@@ -102,7 +153,7 @@ def speedtest():
             print("STATE: Writing to database")
             write_api = client.write_api()
             write_api.write(bucket=influxdb_db, record=p)
-            write_api.__del__()
+            write_api.close()
         except Exception as err:
             print("ERROR: Error writing to database")
             print(err)
@@ -161,6 +212,8 @@ else:
 
     # Instantiate the connection
     connection_string = influxdb_scheme + "://" + influxdb_host + ":" + str(influxdb_port)
+    if influxdb_scheme == "http":
+        print("WARNING: Using HTTP (plaintext). Credentials will be sent unencrypted. Use INFLUXDB_SCHEME=https for production.")
     print("STATE: Database URL is... " + connection_string)
     print("STATE: Connecting to InfluxDB...")
     client = InfluxDBClient(url=connection_string, token=influxdb_token, org=influxdb_org)
