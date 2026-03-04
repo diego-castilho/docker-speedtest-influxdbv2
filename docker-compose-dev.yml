@@ -6,11 +6,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - INFLUXDB_SCHEME=http
       - INFLUXDB_HOST=influxdbv2
       - INFLUXDB_PORT=8086
-      - INFLUXDB_TOKEN=asdfghjkl
       - INFLUXDB_ORG=my_test_org
       - INFLUXDB_DB=SpeedtestStats
       - SLEEPY_TIME=3600
@@ -23,17 +24,16 @@ services:
   influxdbv2:
     container_name: influxdbv2
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=user1
-      - DOCKER_INFLUXDB_INIT_PASSWORD=user1234
       - DOCKER_INFLUXDB_INIT_ORG=my_test_org
       - DOCKER_INFLUXDB_INIT_BUCKET=SpeedtestStats
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=asdfghjkl
     networks:
       - speedtest2
     ports:
-      - '8086:8086'
+      - '127.0.0.1:8086:8086'
     volumes:
       - 'influx2_config:/etc/influxdb2'
       - 'influx2_data:/var/lib/influxdb2'
@@ -45,12 +45,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - INFLUXDB_SCHEME=http
       - INFLUXDB_HOST=influxdbv1
       - INFLUXDB_PORT=8086
-      - INFLUXDB_USER=test1
-      - INFLUXDB_PASS=test1234
       - INFLUXDB_DB=SpeedtestStats
       - SLEEPY_TIME=3600
       - SPEEDTEST_HOST=server04
@@ -62,17 +62,15 @@ services:
   influxdbv1:
     container_name: influxdbv1
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - INFLUXDB_ADMIN_USER=user1
-      - INFLUXDB_ADMIN_PASSWORD=user1234
       - INFLUXDB_DB=SpeedtestStats
-      - INFLUXDB_WRITE_USER=test1
-      - INFLUXDB_WRITE_USER_PASSWORD=test1234
       - INFLUXDB_HTTP_AUTH_ENABLED=true
     networks:
       - speedtest1
     ports:
-      - '8085:8086'
+      - '127.0.0.1:8085:8086'
     volumes:
       - 'influx1_config:/etc/influxdb1'
       - 'influx1_data:/var/lib/influxdb1'
