@@ -22,7 +22,7 @@ start_time = datetime.datetime.utcnow().isoformat()
 default_hostname = socket.gethostname()
 hostname = os.getenv("SPEEDTEST_HOST", default_hostname)
 speedtest_server = os.getenv("SPEEDTEST_SERVER")
-debug_mode = bool(os.getenv("DEBUG_MODE", False))
+debug_mode = os.getenv("DEBUG_MODE", "").lower() in ("true", "1", "yes")
 
 # Validate numeric environment variables
 try:
@@ -94,11 +94,11 @@ def speedtest():
         print("STATE: User specified speedtest server:", speedtest_server)
         speedtest_server_arg = "--server-id="+speedtest_server
         print("STATE: Speedtest running")
-        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json', speedtest_server_arg], stdout=subprocess.PIPE, shell=False, text=True, check=True)  # nosec B603
+        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json', speedtest_server_arg], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True, check=True, timeout=120)  # nosec B603
     else:
         print("STATE: User did not specify speedtest server, using a random server")
         print("STATE: Speedtest running")
-        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json'], stdout=subprocess.PIPE, shell=False, text=True, check=True)  # nosec B603
+        my_speed = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--format=json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True, check=True, timeout=120)  # nosec B603
 
     # Convert the string into JSON, only getting the stdout and stripping the first/last characters
     my_json = json.loads(my_speed.stdout.strip())
